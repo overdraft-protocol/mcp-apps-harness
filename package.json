@@ -1,6 +1,6 @@
 {
   "name": "@overdraft-protocol/mcp-apps-harness",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Render real ext-apps HTML panels against a mock MCP host for fast iteration",
   "license": "MIT",
   "type": "module",
