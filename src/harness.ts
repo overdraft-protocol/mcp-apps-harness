@@ -41,6 +41,12 @@ export interface RenderPanelOptions {
    * must be "dom" when using it.
    */
   runner?: Runner;
+  /**
+   * Return `<script>` bodies verbatim. Default false — panels are single-file
+   * builds with the whole bundle inlined, so the raw DOM is mostly build input
+   * rather than render output.
+   */
+  includeScripts?: boolean;
 }
 
 export async function renderPanel(options: RenderPanelOptions): Promise<RenderResult> {
@@ -65,6 +71,7 @@ export async function renderPanel(options: RenderPanelOptions): Promise<RenderRe
       capabilities: options.capabilities,
       theme: options.viewport?.theme,
       steps: options.steps,
+      includeScripts: options.includeScripts,
     });
   }
 
@@ -75,6 +82,7 @@ export async function renderPanel(options: RenderPanelOptions): Promise<RenderRe
     viewport: options.viewport,
     steps: options.steps,
     mode: options.mode,
+    includeScripts: options.includeScripts,
   });
 }
 

@@ -112,6 +112,17 @@ async function main() {
   assert(viaConfig.errors.length === 0, "panel config: no console errors");
   assert(viaConfig.dom.includes("overdraft"), "panel config: buildCommand ran and DOM contains fixture repo name");
 
+  // 8. Script bodies are elided by default (a single-file panel bundle is
+  // hundreds of KB of build input that would otherwise swamp the DOM output),
+  // but still available on request.
+  const rawHtmlSize = html.length;
+  assert(rendered.dom.length < rawHtmlSize / 10, `default DOM elides the inlined bundle (${rendered.dom.length} chars vs ${rawHtmlSize} of source HTML)`);
+  assert(rendered.dom.includes("elided by mcp-apps-harness"), "default DOM marks where script bodies were elided");
+  assert(rendered.dom.includes("<ul id=\"repo-list\">"), "elision preserves the actual rendered markup");
+
+  const withScripts = await renderPanel({ html, fixture, mode: "dom", includeScripts: true });
+  assert(withScripts.dom.length > rawHtmlSize / 2, "includeScripts:true returns the full bundle verbatim");
+
   if (failures > 0) {
     console.error(`\n${failures} check(s) failed.`);
     process.exit(1);

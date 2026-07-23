@@ -105,6 +105,24 @@ export const DEFAULT_VIEWPORT: Required<Viewport> = {
   theme: "light",
 };
 
+/**
+ * Replace the *body* of every `<script>` with a short placeholder, keeping the
+ * tags and their attributes.
+ *
+ * Panels are single-file builds with the whole bundle inlined, so the raw
+ * serialized DOM is dominated by the megabyte of JS you fed in — which is the
+ * build input, not the render output, and drowns the actual rendered markup
+ * (and, for an MCP client, burns the context window for nothing). Callers that
+ * genuinely want the script bodies can pass `includeScripts: true`.
+ */
+export function stripScriptBodies(html: string): string {
+  return html.replace(
+    /(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi,
+    (_match, open: string, body: string, close: string) =>
+      body.trim().length === 0 ? `${open}${body}${close}` : `${open}/* ${body.length} chars elided by mcp-apps-harness */${close}`,
+  );
+}
+
 /** One step of an `interact` sequence. */
 export interface InteractAction {
   type: "click" | "fill";

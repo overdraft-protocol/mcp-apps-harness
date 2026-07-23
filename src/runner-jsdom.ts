@@ -32,7 +32,15 @@
  */
 import { JSDOM, VirtualConsole } from "jsdom";
 import { createMockHostState, handleHostMessage, queueToolResponse } from "./mock-host.js";
-import { CapturedError, ConsoleMessage, HarnessCapabilities, InteractStep, RenderResult, Theme } from "./protocol.js";
+import {
+  CapturedError,
+  ConsoleMessage,
+  HarnessCapabilities,
+  InteractStep,
+  RenderResult,
+  Theme,
+  stripScriptBodies,
+} from "./protocol.js";
 
 export interface JsdomRenderOptions {
   html: string;
@@ -40,6 +48,8 @@ export interface JsdomRenderOptions {
   capabilities?: HarnessCapabilities;
   theme?: Theme;
   steps?: InteractStep[];
+  /** Return `<script>` bodies verbatim instead of eliding them. Default false. */
+  includeScripts?: boolean;
 }
 
 const CONSOLE_LEVELS = ["log", "info", "warn", "error", "debug"] as const;
@@ -141,7 +151,9 @@ export async function renderWithJsdom(options: JsdomRenderOptions): Promise<Rend
     }
 
     return {
-      dom: window.document.documentElement.outerHTML,
+      dom: options.includeScripts
+        ? window.document.documentElement.outerHTML
+        : stripScriptBodies(window.document.documentElement.outerHTML),
       consoleMessages,
       errors,
       unmappedToolCalls: state.log.unmappedToolCalls,

@@ -17,6 +17,7 @@ import {
   InteractStep,
   RenderResult,
   Viewport,
+  stripScriptBodies,
 } from "./protocol.js";
 
 const IFRAME_ID = "panel";
@@ -28,6 +29,8 @@ export interface ChromiumRenderOptions {
   viewport?: Viewport;
   steps?: InteractStep[];
   mode?: "dom" | "screenshot" | "both";
+  /** Return `<script>` bodies verbatim instead of eliding them. Default false. */
+  includeScripts?: boolean;
 }
 
 export async function renderWithChromium(options: ChromiumRenderOptions): Promise<RenderResult> {
@@ -128,7 +131,7 @@ export async function renderWithChromium(options: ChromiumRenderOptions): Promis
     const log = await page.evaluate(() => (window as any).__mockHostState.log);
 
     return {
-      dom: mode === "screenshot" ? "" : dom,
+      dom: mode === "screenshot" ? "" : options.includeScripts ? dom : stripScriptBodies(dom),
       screenshot,
       consoleMessages,
       errors,

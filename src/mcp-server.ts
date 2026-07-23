@@ -53,6 +53,12 @@ const baseShape = {
   capabilities: z.object(capabilitiesShape).optional(),
   mode: z.enum(["dom", "screenshot", "both"]).optional().describe("What to capture. Default both."),
   viewport: z.object(viewportShape).optional(),
+  includeScripts: z
+    .boolean()
+    .optional()
+    .describe(
+      "Return <script> bodies verbatim in the DOM. Default false — single-file panel builds inline the whole bundle, which is build input rather than render output and swamps the response.",
+    ),
   runner: z
     .enum(["chromium", "jsdom"])
     .optional()
