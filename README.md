@@ -4,6 +4,9 @@ Render real, built [ext-apps](https://github.com/modelcontextprotocol/ext-apps) 
 panels against a mock MCP host, so you can iterate on a panel's UI without a real
 host or MCP server in the loop.
 
+Published as [`@overdraft-protocol/mcp-apps-harness`](https://www.npmjs.com/package/@overdraft-protocol/mcp-apps-harness).
+To wire it into Claude in one step, jump to [Using it with Claude](#using-it-with-claude).
+
 ```
 edit panel -> npm run build:ui -> render_panel({ panelPath, fixture }) -> read DOM/errors/screenshot -> iterate
 ```
@@ -104,32 +107,40 @@ Spawns the server over stdio (`@command @arg...`), calls `--tool`, and writes it
 `structuredContent` to `--out` (or the full `CallToolResult` with `--full`) — ready
 to feed straight into `render_panel`'s `fixture`.
 
-## Setup
+## Using it with Claude
 
-Requires Node 20+ (the CLI uses `node:util`'s `parseArgs`).
+This is a **stdio** MCP server, so it works anywhere Claude reads an MCP server
+config: Claude Code (CLI, VS Code/JetBrains extensions) and Claude Desktop. It
+does **not** work as a Claude.ai web "custom connector" — those require a remote
+(HTTP/SSE) server, which this package doesn't provide.
+
+### Prerequisites
+
+- **Node 20+** (the CLI uses `node:util`'s `parseArgs`).
+- **A Chromium browser for Playwright.** The default runner drives a real
+  Chromium, which Playwright downloads separately from npm. One time, run:
+  ```bash
+  npx playwright install chromium
+  ```
+  Without it, `render_panel`/`interact` fail with a "browser not found" error the
+  first time they run. (If you only ever use `runner: "jsdom"`, you can skip this.)
+
+### Claude Code
+
+The one-liner (adds it to the current project's `.mcp.json`):
 
 ```bash
-npm install
-npx playwright install chromium
+claude mcp add mcp-apps-harness -- npx -y --package=@overdraft-protocol/mcp-apps-harness mcp-apps-harness-mcp
 ```
 
-Add to `.mcp.json` as a stdio server. From within this repo (already set up):
+Add `-s user` to register it globally for all your projects instead of just the
+current one:
 
-```json
-{
-  "mcpServers": {
-    "mcp-apps-harness": { "command": "node", "args": ["dist/mcp-server.js"] }
-  }
-}
+```bash
+claude mcp add -s user mcp-apps-harness -- npx -y --package=@overdraft-protocol/mcp-apps-harness mcp-apps-harness-mcp
 ```
 
-From any other project, via the published `@overdraft-protocol/mcp-apps-harness`
-package — note the server and the CLI are two separate binaries
-(`mcp-apps-harness-mcp` vs `mcp-apps-harness`), since one speaks MCP over stdio
-and the other is a human-facing CLI. Because the package is scoped, `npx`'s
-default bin-name matching would resolve to the CLI (`mcp-apps-harness`, matching
-the unscoped part of the package name), so the server needs an explicit
-`--package`:
+Or write the config by hand — create/edit `.mcp.json` at your project root:
 
 ```json
 {
@@ -142,7 +153,55 @@ the unscoped part of the package name), so the server needs an explicit
 }
 ```
 
-The CLI itself can be run either way:
+Claude Code prompts you to approve a newly added project MCP server the first time
+it starts; approve it, then `render_panel` and `interact` show up as tools. Run
+`/mcp` inside Claude Code to confirm the server is connected.
+
+### Claude Desktop
+
+Edit `claude_desktop_config.json` (Settings → Developer → Edit Config, or:
+`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS,
+`%APPDATA%\Claude\claude_desktop_config.json` on Windows) and add the same
+`mcpServers` block shown above, then fully restart Claude Desktop.
+
+### Why `--package=…` and the exact bin name
+
+The package ships **two** binaries: `mcp-apps-harness-mcp` (the MCP server, which
+Claude talks to over stdio) and `mcp-apps-harness` (the human-facing CLI). Because
+the package name is scoped (`@overdraft-protocol/…`), `npx`'s default bin-name
+matching resolves the bare package to `mcp-apps-harness` (the CLI) — the wrong one
+for Claude. Naming `mcp-apps-harness-mcp` explicitly, with `--package` telling npx
+which package that bin lives in, is what points Claude at the server.
+
+`-y` skips npx's install confirmation prompt (needed since Claude runs it
+non-interactively). npx caches the package after first fetch, so subsequent
+launches are fast; to pin a version, use `@overdraft-protocol/mcp-apps-harness@0.1.0`.
+
+### Local checkout instead of npm
+
+If you've cloned this repo and want Claude to run your local build (e.g. while
+developing the harness itself), point at the built server directly instead:
+
+```json
+{
+  "mcpServers": {
+    "mcp-apps-harness": { "command": "node", "args": ["/absolute/path/to/mcp-apps-harness/dist/mcp-server.js"] }
+  }
+}
+```
+
+(Run `npm install && npm run build` in the checkout first.)
+
+### Using it once connected
+
+Ask Claude in natural language — e.g. *"render dist/repos.html with this fixture
+and show me the screenshot"* or *"click the Save button and mock repos_set
+returning success, then check for console errors."* Claude calls `render_panel` /
+`interact` with the arguments described under [MCP tools](#mcp-tools) above.
+
+### Standalone CLI (no Claude)
+
+The CLI bin is available from the same package for shell/CI use:
 
 ```bash
 npx -y --package=@overdraft-protocol/mcp-apps-harness mcp-apps-harness render --help
@@ -173,7 +232,7 @@ This builds the harness, builds the example panel, and runs two suites:
 ## Library usage
 
 ```ts
-import { renderPanel, interact } from "mcp-apps-harness";
+import { renderPanel, interact } from "@overdraft-protocol/mcp-apps-harness";
 
 const result = await renderPanel({
   panelPath: "dist/repos.html",
