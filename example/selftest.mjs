@@ -1,4 +1,5 @@
-import { readFile, rm } from "node:fs/promises";
+import { readFile, rm, writeFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { renderPanel, interact } from "../dist/index.js";
@@ -122,6 +123,59 @@ async function main() {
 
   const withScripts = await renderPanel({ html, fixture, mode: "dom", includeScripts: true });
   assert(withScripts.dom.length > rawHtmlSize / 2, "includeScripts:true returns the full bundle verbatim");
+
+  // 9. panelUrl: serve the panel over loopback HTTP and render it without the
+  // harness ever touching the filesystem. This is the path that works when the
+  // process can't read the project directory (e.g. a macOS host app denied
+  // Documents access) — loopback sockets aren't gated the way file access is.
+  const server = createServer((req, res) => {
+    if (req.url === "/repos.html") {
+      res.writeHead(200, { "content-type": "text/html" });
+      res.end(html);
+    } else {
+      res.writeHead(404);
+      res.end("not found");
+    }
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  const port = server.address().port;
+
+  try {
+    const viaUrl = await interact({
+      panelUrl: `http://127.0.0.1:${port}/repos.html`,
+      fixture,
+      mode: "dom",
+      steps: [
+        {
+          action: { type: "click", selector: "#save-btn" },
+          respondWith: { tool: "repos_set", result: { content: [], isError: false } },
+        },
+      ],
+    });
+    assert(viaUrl.errors.length === 0, `panelUrl: no console errors (got: ${JSON.stringify(viaUrl.errors)})`);
+    assert(viaUrl.dom.includes("overdraft"), "panelUrl: fetched panel rendered the fixture");
+    assert(viaUrl.dom.includes('id="status">saved<'), "panelUrl: full interact cycle works over HTTP");
+
+    // A url-declared entry in .mcp-apps-harness.json resolves the same way.
+    const urlConfigDir = path.join(__dirname, "dist");
+    await writeFile(
+      path.join(urlConfigDir, ".mcp-apps-harness.json"),
+      JSON.stringify({ panels: { "repos-dev": { url: `http://127.0.0.1:${port}/repos.html` } } }),
+    );
+    const viaUrlConfig = await renderPanel({ panel: "repos-dev", cwd: urlConfigDir, fixture, mode: "dom" });
+    assert(viaUrlConfig.dom.includes("overdraft"), "panelUrl: url-declared panel config entry resolves and renders");
+
+    // A dev server that isn't running should say so, not throw a raw fetch error.
+    let refusedMessage = "";
+    try {
+      await renderPanel({ panelUrl: `http://127.0.0.1:${port}/nope.html`, fixture, mode: "dom" });
+    } catch (err) {
+      refusedMessage = err.message;
+    }
+    assert(refusedMessage.includes("HTTP 404"), "panelUrl: a bad path reports the HTTP status");
+  } finally {
+    server.close();
+  }
 
   if (failures > 0) {
     console.error(`\n${failures} check(s) failed.`);

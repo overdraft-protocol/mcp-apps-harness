@@ -1,7 +1,7 @@
 export { renderPanel, interact } from "./harness.js";
 export type { RenderPanelOptions, InteractOptions, RenderMode, Runner } from "./harness.js";
-export { loadConfig, resolvePanelPath, CONFIG_FILENAME } from "./config.js";
-export type { HarnessConfig, PanelConfigEntry } from "./config.js";
+export { loadConfig, resolvePanel, resolvePanelPath, CONFIG_FILENAME } from "./config.js";
+export type { HarnessConfig, PanelConfigEntry, ResolvedPanel } from "./config.js";
 export { renderWithChromium } from "./runner-chromium.js";
 export type { ChromiumRenderOptions } from "./runner-chromium.js";
 export { renderWithJsdom } from "./runner-jsdom.js";

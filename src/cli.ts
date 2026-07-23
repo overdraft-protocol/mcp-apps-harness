@@ -27,11 +27,12 @@ function printUsageAndExit(code: number): never {
   console.error(
     [
       "Usage:",
-      "  mcp-apps-harness render --panel-path <file> | --panel <name> --fixture <json|@file> [options]",
+      "  mcp-apps-harness render --panel-path <file> | --panel-url <url> | --panel <name> --fixture <json|@file> [options]",
       "  mcp-apps-harness capture-fixture --command <cmd> [--arg <a> ...] --tool <name> --out <file> [--tool-args <json|@file>]",
       "",
       "render options:",
       "  --panel-path <file>       Built single-file HTML panel.",
+      "  --panel-url <url>         Fetch the built panel HTML from a URL (e.g. a dev server).",
       "  --panel <name>            Panel name from .mcp-apps-harness.json (use with --cwd).",
       "  --cwd <dir>               Directory to resolve .mcp-apps-harness.json in. Default: cwd.",
       "  --fixture <json|@file>    structuredContent pushed once the panel connects. Required.",
@@ -52,6 +53,7 @@ async function runRender(argv: string[]): Promise<void> {
     args: argv,
     options: {
       "panel-path": { type: "string" },
+      "panel-url": { type: "string" },
       panel: { type: "string" },
       cwd: { type: "string" },
       fixture: { type: "string" },
@@ -73,8 +75,8 @@ async function runRender(argv: string[]): Promise<void> {
     console.error("mcp-apps-harness render: --fixture is required\n");
     printUsageAndExit(1);
   }
-  if (!values["panel-path"] && !values.panel) {
-    console.error("mcp-apps-harness render: one of --panel-path or --panel is required\n");
+  if (!values["panel-path"] && !values.panel && !values["panel-url"]) {
+    console.error("mcp-apps-harness render: one of --panel-path, --panel-url or --panel is required\n");
     printUsageAndExit(1);
   }
 
@@ -85,6 +87,7 @@ async function runRender(argv: string[]): Promise<void> {
 
   const result = await renderPanel({
     panelPath: values["panel-path"],
+    panelUrl: values["panel-url"],
     panel: values.panel,
     cwd: values.cwd,
     fixture,

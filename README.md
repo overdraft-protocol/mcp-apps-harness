@@ -44,7 +44,7 @@ bindings that share it:
 
 ## MCP tools
 
-- `render_panel({ panelPath | html | panel, fixture, capabilities?, mode?, viewport?, runner? })` —
+- `render_panel({ panelPath | html | panelUrl | panel, fixture, capabilities?, mode?, viewport?, runner? })` —
   load a panel, push `fixture` as the initial tool result, capture DOM + screenshot
   + console errors/uncaught exceptions + any tool calls the panel attempted with no
   mocked response configured.
@@ -54,8 +54,15 @@ bindings that share it:
   when that action triggers `app.callServerTool(...)` (e.g. a Save button).
 
 `render_panel` is `interact` with no `steps` — same code path underneath
-(`src/harness.ts`). `panel` (instead of `panelPath`/`html`) looks the name up in a
-project's `.mcp-apps-harness.json` — see "Project config" below.
+(`src/harness.ts`). Provide exactly one panel source:
+
+- `panelPath` — read a built HTML file off disk.
+- `html` — the built HTML content, inline.
+- `panelUrl` — fetch the built HTML from a URL, e.g. a running dev server
+  (`http://localhost:5173/repos.html`). Needs no filesystem access at all — see
+  "Filesystem access / EPERM" below for why that matters.
+- `panel` — look the name up in a project's `.mcp-apps-harness.json` (may
+  resolve to either of the above) — see "Project config" below.
 
 ## Project config
 
@@ -65,7 +72,8 @@ your project root:
 ```json
 {
   "panels": {
-    "repos": { "path": "src/ui/dist/repos.html", "buildCommand": "npm run build:ui" }
+    "repos": { "path": "src/ui/dist/repos.html", "buildCommand": "npm run build:ui" },
+    "repos-dev": { "url": "http://localhost:5173/repos.html" }
   }
 }
 ```
@@ -73,7 +81,27 @@ your project root:
 Then `render_panel({ panel: "repos", fixture })` runs `buildCommand` (if present,
 in the config file's directory) and resolves `path` relative to that same
 directory before rendering — so your edit/build/render loop becomes one call
-instead of three.
+instead of three. A `url` entry (like `repos-dev` above) is fetched instead of
+read off disk, running `buildCommand` first if present there too.
+
+## Filesystem access / EPERM
+
+On macOS, `~/Documents`, `~/Desktop`, and `~/Downloads` are TCC-protected: a
+process whose parent app (e.g. Claude Desktop) was denied access to one of
+those folders gets `EPERM` reading files there — even files you can read fine
+yourself — because the OS attributes the grant to the responsible app, not to
+this server specifically. If you don't want to grant a host app that broad an
+access, or can't, use `panelUrl` instead of `panelPath`/`panel`: serve the
+built panel from any local dev server (`vite`, `python -m http.server`,
+whatever you already have) and point `panelUrl` at it. Loopback HTTP isn't
+subject to the same gate, so this needs no filesystem grant at all — verified
+by spawning the server with a `cwd` outside the project and confirming
+`panelUrl` still renders correctly.
+
+`render_panel`/`interact` detect this specific failure (`EPERM` on darwin) and
+return an error explaining the cause and all three options — grant access,
+switch to `panelUrl`, or move the panel outside the protected folders — rather
+than a bare `EPERM: operation not permitted, open '...'`.
 
 ## CLI
 

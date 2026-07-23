@@ -1,26 +1,39 @@
 /**
- * Public orchestration: renderPanel({ html|panelPath|panel, fixture,
+ * Public orchestration: renderPanel({ html|panelPath|panelUrl|panel, fixture,
  * capabilities, steps, mode, viewport }). `render_panel` is just `interact`
  * with no steps — one code path, two MCP tools for clarity (see mcp-server.ts).
  */
 import { readFile } from "node:fs/promises";
 import { renderWithChromium } from "./runner-chromium.js";
 import { renderWithJsdom } from "./runner-jsdom.js";
-import { resolvePanelPath } from "./config.js";
+import { resolvePanel } from "./config.js";
 import { HarnessCapabilities, InteractStep, RenderResult, Viewport } from "./protocol.js";
 
 export type RenderMode = "dom" | "screenshot" | "both";
 export type Runner = "chromium" | "jsdom";
 
 export interface RenderPanelOptions {
-  /** Built single-file HTML to load. Provide exactly one of `html`, `panelPath`, `panel`. */
+  /** Built single-file HTML to load. Provide exactly one panel source. */
   html?: string;
-  /** Path to a built single-file HTML file. Provide exactly one of `html`, `panelPath`, `panel`. */
+  /** Path to a built single-file HTML file. Provide exactly one panel source. */
   panelPath?: string;
   /**
-   * Panel name looked up in `.mcp-apps-harness.json`'s `panels` map. If that
-   * entry has a `buildCommand`, it's run first. Provide exactly one of
-   * `html`, `panelPath`, `panel`.
+   * URL to fetch the built panel HTML from, e.g. a running dev server
+   * (`http://localhost:5173/repos.html`).
+   *
+   * Useful when the process running this harness can't read the panel off
+   * disk — most notably on macOS, where an MCP server spawned by a host app
+   * that was denied Documents/Desktop/Downloads access gets EPERM on those
+   * paths. Loopback HTTP isn't gated the same way, so serving the panel from
+   * a dev server sidesteps the filesystem entirely.
+   *
+   * Provide exactly one panel source.
+   */
+  panelUrl?: string;
+  /**
+   * Panel name looked up in `.mcp-apps-harness.json`'s `panels` map. The entry
+   * may specify `path` or `url`; if it has a `buildCommand`, that runs first.
+   * Provide exactly one panel source.
    */
   panel?: string;
   /** Directory to look for `.mcp-apps-harness.json` in, when using `panel`. Default `process.cwd()`. */
@@ -50,13 +63,16 @@ export interface RenderPanelOptions {
 }
 
 export async function renderPanel(options: RenderPanelOptions): Promise<RenderResult> {
-  const sources = [options.html, options.panelPath, options.panel].filter((v) => v !== undefined);
+  const sources = [options.html, options.panelPath, options.panelUrl, options.panel].filter(
+    (v) => v !== undefined,
+  );
   if (sources.length !== 1) {
-    throw new Error("mcp-apps-harness: renderPanel requires exactly one of `html`, `panelPath`, or `panel`");
+    throw new Error(
+      "mcp-apps-harness: renderPanel requires exactly one of `html`, `panelPath`, `panelUrl`, or `panel`",
+    );
   }
 
-  const panelPath = options.panel ? await resolvePanelPath(options.panel, options.cwd) : options.panelPath;
-  const html = options.html ?? (await readFile(panelPath as string, "utf-8"));
+  const html = await loadPanelHtml(options);
   const runner = options.runner ?? "chromium";
 
   if (runner === "jsdom") {
@@ -84,6 +100,58 @@ export async function renderPanel(options: RenderPanelOptions): Promise<RenderRe
     mode: options.mode,
     includeScripts: options.includeScripts,
   });
+}
+
+/**
+ * Resolve whichever panel source the caller supplied down to an HTML string.
+ *
+ * A `panel` name may resolve to either a path or a URL depending on how the
+ * project's `.mcp-apps-harness.json` declares it.
+ */
+async function loadPanelHtml(options: RenderPanelOptions): Promise<string> {
+  if (options.html !== undefined) return options.html;
+  if (options.panelUrl !== undefined) return fetchPanelHtml(options.panelUrl);
+
+  if (options.panel !== undefined) {
+    // One resolve call only — it may run the entry's buildCommand.
+    const resolved = await resolvePanel(options.panel, options.cwd);
+    return resolved.kind === "url" ? fetchPanelHtml(resolved.url) : readPanelFile(resolved.path);
+  }
+
+  return readPanelFile(options.panelPath as string);
+}
+
+async function fetchPanelHtml(url: string): Promise<string> {
+  let response: Response;
+  try {
+    response = await fetch(url);
+  } catch (err) {
+    throw new Error(
+      `mcp-apps-harness: could not fetch panel from ${url} (${(err as Error).message}) — is the dev server running?`,
+    );
+  }
+  if (!response.ok) {
+    throw new Error(`mcp-apps-harness: fetching panel from ${url} returned HTTP ${response.status} ${response.statusText}`);
+  }
+  return response.text();
+}
+
+async function readPanelFile(path: string): Promise<string> {
+  try {
+    return await readFile(path, "utf-8");
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === "EPERM" && process.platform === "darwin") {
+      throw new Error(
+        `mcp-apps-harness: permission denied reading ${path}.\n` +
+          "On macOS, ~/Documents, ~/Desktop and ~/Downloads are protected: a process whose parent app was denied access to that folder gets EPERM even though the file is readable by you. Either:\n" +
+          "  - serve the panel from a dev server and pass `panelUrl` instead (no filesystem access needed), or\n" +
+          "  - grant the host app access under System Settings > Privacy & Security > Files and Folders, or\n" +
+          "  - keep the panel outside those protected folders.",
+      );
+    }
+    throw err;
+  }
 }
 
 export type InteractOptions = RenderPanelOptions & { steps: InteractStep[] };

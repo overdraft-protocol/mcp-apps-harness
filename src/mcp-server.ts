@@ -40,13 +40,19 @@ const stepShape = z.object({
 });
 
 const baseShape = {
-  panelPath: z.string().optional().describe("Path to a built single-file HTML panel. Provide exactly one of panelPath, html, panel."),
-  html: z.string().optional().describe("Built single-file HTML content. Provide exactly one of panelPath, html, panel."),
+  panelPath: z.string().optional().describe("Path to a built single-file HTML panel. Provide exactly one of panelPath, html, panelUrl, panel."),
+  html: z.string().optional().describe("Built single-file HTML content. Provide exactly one of panelPath, html, panelUrl, panel."),
+  panelUrl: z
+    .string()
+    .optional()
+    .describe(
+      "URL to fetch the built panel HTML from, e.g. a running dev server (http://localhost:5173/repos.html). Needs no filesystem access, so it works when this server can't read the project directory. Provide exactly one of panelPath, html, panelUrl, panel.",
+    ),
   panel: z
     .string()
     .optional()
     .describe(
-      "Panel name looked up in .mcp-apps-harness.json's `panels` map (runs its buildCommand first, if any). Provide exactly one of panelPath, html, panel.",
+      "Panel name looked up in .mcp-apps-harness.json's `panels` map (runs its buildCommand first, if any). Provide exactly one of panelPath, html, panelUrl, panel.",
     ),
   cwd: z.string().optional().describe("Directory to look for .mcp-apps-harness.json in, when using `panel`. Default process.cwd()."),
   fixture: z.record(z.string(), z.unknown()).describe("structuredContent (or a full CallToolResult) pushed once the panel connects."),
