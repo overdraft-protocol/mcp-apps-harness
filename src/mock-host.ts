@@ -151,11 +151,55 @@ export function handleHostMessage(msg: any, state: MockHostState): JsonRpcMessag
     return out;
   }
 
+  // These four have REQUIRED result fields (mode / resources / contents /
+  // model+content+stopReason) — an empty `{}` fails the App SDK's own zod
+  // validation of the response and rejects the app's promise with a schema
+  // error that has nothing to do with the panel's own code. Answer with a
+  // shape that actually satisfies each schema instead.
+  if (msg.method === "ui/request-display-mode" && msg.id !== undefined) {
+    // Honor whatever was requested — we don't model real display-mode
+    // constraints, so there's nothing to reject it in favor of.
+    out.push({ jsonrpc: "2.0", id: msg.id, result: { mode: msg.params?.mode } });
+    return out;
+  }
+
+  if (msg.method === "resources/list" && msg.id !== undefined) {
+    out.push({ jsonrpc: "2.0", id: msg.id, result: { resources: [] } });
+    return out;
+  }
+
+  if (msg.method === "resources/templates/list" && msg.id !== undefined) {
+    out.push({ jsonrpc: "2.0", id: msg.id, result: { resourceTemplates: [] } });
+    return out;
+  }
+
+  if (msg.method === "resources/read" && msg.id !== undefined) {
+    // An empty `contents` array is valid per schema (no minimum length) and
+    // resolves cleanly, unlike the alternative of guessing at fake content.
+    out.push({ jsonrpc: "2.0", id: msg.id, result: { contents: [] } });
+    return out;
+  }
+
+  if (msg.method === "sampling/createMessage" && msg.id !== undefined) {
+    // No valid *empty* CreateMessageResult exists (role/content/model/stopReason
+    // are all required) and fabricating fake model output would be actively
+    // misleading. A real JSON-RPC error rejects the app's promise cleanly with
+    // an explanatory message, the same way a host without sampling support
+    // would reject it, instead of a schema-validation crash.
+    out.push({
+      jsonrpc: "2.0",
+      id: msg.id,
+      error: { code: -32601, message: "mcp-apps-harness: sampling/createMessage is not mocked by this harness" },
+    });
+    return out;
+  }
+
   // Any other request we don't model explicitly (ui/download-file, ui/message,
-  // ui/update-model-context, ui/request-display-mode, resources/*, tools/list,
-  // sampling/createMessage, ping, ...): acknowledge with an empty result so the
-  // app's pending promise resolves instead of hanging/timing out. Notifications
-  // we don't model (e.g. ui/notifications/size-changed) are silently ignored.
+  // ui/update-model-context, tools/list, prompts/list, ping, ...): these all
+  // have all-optional result shapes, so an empty result resolves the app's
+  // pending promise as a (fake, unrecorded) success instead of hanging or
+  // crashing. Notifications we don't model (e.g. ui/notifications/size-changed)
+  // are silently ignored.
   if (msg.id !== undefined) {
     out.push({ jsonrpc: "2.0", id: msg.id, result: {} });
   }

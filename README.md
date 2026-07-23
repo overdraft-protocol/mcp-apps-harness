@@ -198,11 +198,15 @@ reducer (`handleHostMessage`, in `src/mock-host.ts`), plus two runners that shar
 
 ## Known limitations
 
-- Only `ui/initialize`, `ui/notifications/initialized`, `ui/notifications/tool-result`
-  (push), `tools/call`, and `ui/open-link` are modeled with real behavior. Other
-  request methods (`ui/download-file`, `ui/message`, `ui/update-model-context`,
-  `ui/request-display-mode`, `resources/*`, `sampling/createMessage`) get a generic
-  empty-result acknowledgement so the app's promise resolves instead of hanging.
+- `ui/initialize`, `ui/notifications/initialized`, `ui/notifications/tool-result`
+  (push), `tools/call`, `ui/open-link`, `ui/request-display-mode`, `resources/list`,
+  `resources/templates/list`, and `resources/read` are modeled with real, schema-valid
+  behavior. `sampling/createMessage` isn't mocked and rejects cleanly (no capability
+  flag to opt in yet). `ui/download-file`, `ui/message`, and `ui/update-model-context`
+  still get a generic empty-result acknowledgement — their result schemas make that a
+  valid (if silent, unrecorded) success rather than a crash, but there's no way yet to
+  assert a panel actually called them, the way `unmappedToolCalls`/`openLinkAttempts`
+  let you assert on tool calls and open-link attempts.
 - The Chromium runner's panel iframe isn't sandboxed (no `sandbox` attribute, no
   dedicated origin) — this simplifies same-origin DOM access but doesn't verify a
   panel's behavior under the CSP/sandbox restrictions a real host would apply.

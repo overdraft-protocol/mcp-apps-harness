@@ -63,6 +63,25 @@ async function main() {
   assert(gated.unmappedToolCalls.length === 0, "no tool call attempted when serverTools capability is disabled");
   assert(gated.dom.includes('id="status">server tools unavailable<'), "panel respects getHostCapabilities().serverTools");
 
+  // 4b. The four protocol methods with required result fields must resolve
+  // (not reject with a schema-validation error) with correctly-shaped mock
+  // responses, except sampling/createMessage, which has no sensible empty
+  // response and must reject cleanly instead of crashing on validation.
+  const protocol = await interact({
+    html,
+    fixture,
+    steps: [{ action: { type: "click", selector: "#protocol-btn" } }],
+  });
+  assert(protocol.errors.length === 0, `protocol methods: no console errors (got: ${JSON.stringify(protocol.errors)})`);
+  assert(protocol.dom.includes("displayMode=fullscreen"), "requestDisplayMode resolves with the echoed mode");
+  assert(protocol.dom.includes("resources=0"), "listServerResources resolves with an empty array, not a schema error");
+  assert(protocol.dom.includes("contents=0"), "readServerResource resolves with empty contents, not a schema error");
+  assert(
+    protocol.dom.includes("sampling-rejected:") &&
+      protocol.dom.includes("mcp-apps-harness: sampling/createMessage is not mocked"),
+    "createSamplingMessage rejects cleanly with an explanatory message instead of a raw schema error",
+  );
+
   // 5. Capability gating, openLinks branch: enabled -> ui/open-link is accepted
   // and recorded; disabled -> the panel doesn't even attempt the call.
   const linkAllowed = await interact({

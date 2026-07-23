@@ -26,8 +26,10 @@ function render(content: RepoListContent | undefined) {
     </ul>
     <button id="save-btn" type="button">Save</button>
     <button id="docs-btn" type="button">Open docs</button>
+    <button id="protocol-btn" type="button">Test protocol methods</button>
     <div id="status"></div>
     <div id="link-status"></div>
+    <div id="protocol-status"></div>
   `;
 
   const saveBtn = document.getElementById("save-btn")!;
@@ -62,6 +64,48 @@ function render(content: RepoListContent | undefined) {
     } catch (err) {
       linkStatus.textContent = `error: ${(err as Error).message}`;
     }
+  });
+
+  // Exercises the four AppRequest methods whose result schemas have required
+  // fields (mode / resources / contents / model+content+stopReason), where a
+  // naive empty mock response used to fail the SDK's own response validation.
+  const protocolBtn = document.getElementById("protocol-btn")!;
+  protocolBtn.addEventListener("click", async () => {
+    const protocolStatus = document.getElementById("protocol-status")!;
+    const parts: string[] = [];
+
+    try {
+      const displayMode = await app.requestDisplayMode({ mode: "fullscreen" });
+      parts.push(`displayMode=${displayMode.mode}`);
+    } catch (err) {
+      parts.push(`displayMode-error: ${(err as Error).message}`);
+    }
+
+    try {
+      const resources = await app.listServerResources();
+      parts.push(`resources=${resources.resources.length}`);
+    } catch (err) {
+      parts.push(`resources-error: ${(err as Error).message}`);
+    }
+
+    try {
+      const read = await app.readServerResource({ uri: "test://nothing" });
+      parts.push(`contents=${read.contents.length}`);
+    } catch (err) {
+      parts.push(`read-error: ${(err as Error).message}`);
+    }
+
+    try {
+      await app.createSamplingMessage({
+        messages: [{ role: "user", content: { type: "text", text: "hi" } }],
+        maxTokens: 10,
+      });
+      parts.push("sampling=resolved");
+    } catch (err) {
+      parts.push(`sampling-rejected: ${(err as Error).message}`);
+    }
+
+    protocolStatus.textContent = parts.join(" | ");
   });
 }
 
