@@ -123,16 +123,29 @@ Add to `.mcp.json` as a stdio server. From within this repo (already set up):
 }
 ```
 
-From any other project, once published to npm — note the server and the CLI are
-two separate binaries (`mcp-apps-harness-mcp` vs `mcp-apps-harness`), since one
-speaks MCP over stdio and the other is a human-facing CLI:
+From any other project, via the published `@overdraft-protocol/mcp-apps-harness`
+package — note the server and the CLI are two separate binaries
+(`mcp-apps-harness-mcp` vs `mcp-apps-harness`), since one speaks MCP over stdio
+and the other is a human-facing CLI. Because the package is scoped, `npx`'s
+default bin-name matching would resolve to the CLI (`mcp-apps-harness`, matching
+the unscoped part of the package name), so the server needs an explicit
+`--package`:
 
 ```json
 {
   "mcpServers": {
-    "mcp-apps-harness": { "command": "npx", "args": ["-y", "mcp-apps-harness-mcp"] }
+    "mcp-apps-harness": {
+      "command": "npx",
+      "args": ["-y", "--package=@overdraft-protocol/mcp-apps-harness", "mcp-apps-harness-mcp"]
+    }
   }
 }
+```
+
+The CLI itself can be run either way:
+
+```bash
+npx -y --package=@overdraft-protocol/mcp-apps-harness mcp-apps-harness render --help
 ```
 
 ## Self-test

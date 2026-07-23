@@ -1,10 +1,21 @@
 {
-  "name": "mcp-apps-harness",
+  "name": "@overdraft-protocol/mcp-apps-harness",
   "version": "0.1.0",
   "description": "Render real ext-apps HTML panels against a mock MCP host for fast iteration",
   "license": "MIT",
   "type": "module",
   "main": "dist/index.js",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/overdraft-protocol/mcp-apps-harness.git"
+  },
+  "homepage": "https://github.com/overdraft-protocol/mcp-apps-harness#readme",
+  "bugs": {
+    "url": "https://github.com/overdraft-protocol/mcp-apps-harness/issues"
+  },
   "bin": {
     "mcp-apps-harness": "dist/cli.js",
     "mcp-apps-harness-mcp": "dist/mcp-server.js"
