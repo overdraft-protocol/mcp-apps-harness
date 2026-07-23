@@ -1,68 +1,48 @@
 # mcp-apps-harness
 
 Render real, built [ext-apps](https://github.com/modelcontextprotocol/ext-apps) HTML
-panels against a mock MCP host, so you can iterate on a panel's UI without a real
-host or MCP server in the loop.
+panels against a mock MCP host, so you can iterate on a panel's UI — DOM, screenshots,
+console errors, mocked tool calls — without a real host or MCP server in the loop.
 
-Published as [`@overdraft-protocol/mcp-apps-harness`](https://www.npmjs.com/package/@overdraft-protocol/mcp-apps-harness).
-To wire it into Claude in one step, jump to [Using it with Claude](#using-it-with-claude).
+[`@overdraft-protocol/mcp-apps-harness`](https://www.npmjs.com/package/@overdraft-protocol/mcp-apps-harness) on npm · MIT licensed
 
 ```
-edit panel -> npm run build:ui -> render_panel({ panelPath, fixture }) -> read DOM/errors/screenshot -> iterate
+edit panel -> build -> render_panel({ panelPath, fixture }) -> read DOM/errors/screenshot -> iterate
 ```
 
-## How it works
+## Quick start (Claude Code)
 
-Panels built with `@modelcontextprotocol/ext-apps`'s `App` class talk to their host
-over `postMessage`: `App.connect()` sends `ui/initialize`, the host replies with
-capabilities + context, the app sends `ui/notifications/initialized`, and the host
-pushes the first `ui/notifications/tool-result` to trigger the panel's render. From
-then on, `app.callServerTool(...)` proxies `tools/call` through the host.
+```bash
+npx playwright install chromium   # one-time: the default runner drives a real browser
+claude mcp add mcp-apps-harness -- npx -y --package=@overdraft-protocol/mcp-apps-harness mcp-apps-harness-mcp
+```
 
-This harness implements the **host** side of that protocol (`src/mock-host.ts`) as a
-pure, self-contained reducer (`handleHostMessage(msg, state)`), plus two transport
-bindings that share it:
-
-- **Chromium** (`src/runner-chromium.ts`, default, always works): loads the panel's
-  real HTML into an iframe inside a Playwright page, injects the reducer into the
-  page (serialized via `Function.prototype.toString()` so it's byte-identical to the
-  Node-side copy), and drives everything through real `postMessage`/DOM/JS. Produces
-  real screenshots.
-- **jsdom** (`src/runner-jsdom.ts`, fast path, no screenshots): runs the reducer
-  directly in the same Node process — no browser needed. Deliberately *not* an
-  iframe: jsdom 25's nested-browsing-context support is too unreliable for that
-  (`srcdoc` never navigates at all; `src="data:..."` navigates but breaks
-  `event.source` identity, which `PostMessageTransport` depends on). Instead the
-  panel's bundle runs as the JSDOM instance's own top-level window, with
-  `window.parent` monkey-patched to a fake host object that calls the same
-  `handleHostMessage` reducer directly — no cross-frame `postMessage` involved.
-  jsdom also has no `ResizeObserver`, which `App.connect()` needs for its
-  (default-on) auto-resize setup, so a no-op stub is installed before the panel's
-  script runs. With both of those handled, this path works for any panel built as
-  a classic (non-module) script — see the "Known limitations" section for the one
-  real gap that remains (ES modules).
+Then just ask Claude, e.g. *"render dist/repos.html with this fixture and show me the
+screenshot"* or *"click the Save button and mock repos_set returning success, then
+check for console errors."* See [Using it with Claude](#using-it-with-claude) for
+Claude Desktop setup, global registration, and running from a local checkout instead
+of npm.
 
 ## MCP tools
 
-- `render_panel({ panelPath | html | panelUrl | panel, fixture, capabilities?, mode?, viewport?, runner? })` —
-  load a panel, push `fixture` as the initial tool result, capture DOM + screenshot
-  + console errors/uncaught exceptions + any tool calls the panel attempted with no
+- **`render_panel`** `({ panelPath | html | panelUrl | panel, fixture, capabilities?, mode?, viewport?, runner? })` —
+  load a panel, push `fixture` as the initial tool result, capture DOM + screenshot +
+  console errors/uncaught exceptions + any tool calls the panel attempted with no
   mocked response configured.
-- `interact({ ...same as above, steps })` — same, then replays a sequence of
+- **`interact`** `({ ...same as above, steps })` — same, then replays a sequence of
   `{ action: { type: "click"|"fill", selector }, respondWith?: { tool, result } }`
   steps. `respondWith` queues the mocked `tools/call` response the mock host returns
   when that action triggers `app.callServerTool(...)` (e.g. a Save button).
 
-`render_panel` is `interact` with no `steps` — same code path underneath
-(`src/harness.ts`). Provide exactly one panel source:
+`render_panel` is `interact` with no `steps` — same code path underneath. Provide
+exactly one panel source:
 
-- `panelPath` — read a built HTML file off disk.
-- `html` — the built HTML content, inline.
-- `panelUrl` — fetch the built HTML from a URL, e.g. a running dev server
-  (`http://localhost:5173/repos.html`). Needs no filesystem access at all — see
-  "Filesystem access / EPERM" below for why that matters.
-- `panel` — look the name up in a project's `.mcp-apps-harness.json` (may
-  resolve to either of the above) — see "Project config" below.
+| Source | What it does |
+| --- | --- |
+| `panelPath` | Read a built HTML file off disk. |
+| `html` | The built HTML content, inline. |
+| `panelUrl` | Fetch the built HTML from a URL, e.g. a running dev server (`http://localhost:5173/repos.html`). Needs no filesystem access — see [Filesystem access](#filesystem-access-on-macos). |
+| `panel` | Look the name up in `.mcp-apps-harness.json` (may resolve to either of the above) — see [Project config](#project-config). |
 
 ## Project config
 
@@ -78,46 +58,39 @@ your project root:
 }
 ```
 
-Then `render_panel({ panel: "repos", fixture })` runs `buildCommand` (if present,
-in the config file's directory) and resolves `path` relative to that same
-directory before rendering — so your edit/build/render loop becomes one call
-instead of three. A `url` entry (like `repos-dev` above) is fetched instead of
-read off disk, running `buildCommand` first if present there too.
+`render_panel({ panel: "repos", fixture })` runs `buildCommand` (if present) and
+resolves `path` relative to the config file's directory before rendering — so your
+edit/build/render loop becomes one call instead of three. A `url` entry (like
+`repos-dev`) is fetched instead of read off disk.
 
-## Filesystem access / EPERM
+## Filesystem access (on macOS)
 
-On macOS, `~/Documents`, `~/Desktop`, and `~/Downloads` are TCC-protected: a
-process whose parent app (e.g. Claude Desktop) was denied access to one of
-those folders gets `EPERM` reading files there — even files you can read fine
-yourself — because the OS attributes the grant to the responsible app, not to
-this server specifically. If you don't want to grant a host app that broad an
-access, or can't, use `panelUrl` instead of `panelPath`/`panel`: serve the
-built panel from any local dev server (`vite`, `python -m http.server`,
-whatever you already have) and point `panelUrl` at it. Loopback HTTP isn't
-subject to the same gate, so this needs no filesystem grant at all — verified
-by spawning the server with a `cwd` outside the project and confirming
-`panelUrl` still renders correctly.
+`~/Documents`, `~/Desktop`, and `~/Downloads` are TCC-protected: if the app that
+spawned this server (e.g. Claude Desktop) was denied access to one of those folders,
+`panelPath`/`panel` reads from there fail with `EPERM` — even for files you can read
+yourself, since the OS grants access to the responsible app, not to this server. The
+error message explains the cause and your options when this happens.
 
-`render_panel`/`interact` detect this specific failure (`EPERM` on darwin) and
-return an error explaining the cause and all three options — grant access,
-switch to `panelUrl`, or move the panel outside the protected folders — rather
-than a bare `EPERM: operation not permitted, open '...'`.
+If you'd rather not grant that access, use `panelUrl` instead: point it at any local
+dev server (`vite`, `python -m http.server`, whatever you already run). Loopback HTTP
+isn't subject to the same restriction, so this needs no filesystem grant at all.
 
 ## CLI
 
 For use outside an MCP client (shell scripts, CI, quick manual checks):
 
 ```bash
-mcp-apps-harness render --panel-path dist/repos.html --fixture @fixture.json --out screenshot.png
+npx -y --package=@overdraft-protocol/mcp-apps-harness mcp-apps-harness render \
+  --panel-path dist/repos.html --fixture @fixture.json --out screenshot.png
+
 mcp-apps-harness render --panel repos --cwd . --fixture '{"repos":[]}' --mode dom
 mcp-apps-harness render --help
 ```
 
-`--fixture`, `--steps`, `--capabilities`, and `--tool-args` accept either inline
-JSON or `@path/to/file.json`. `--out` writes the screenshot to disk; `--json`
-prints the full result (DOM, console messages, errors, unmapped tool calls,
-open-link attempts, and the base64 screenshot) instead of the human-readable
-summary.
+`--fixture`, `--steps`, `--capabilities`, and `--tool-args` accept either inline JSON
+or `@path/to/file.json`. `--out` writes the screenshot to disk; `--json` prints the
+full result (DOM, console messages, errors, unmapped tool calls, open-link attempts,
+and the base64 screenshot) instead of the human-readable summary.
 
 ### capture-fixture
 
@@ -131,44 +104,29 @@ mcp-apps-harness capture-fixture \
   --out fixtures/repos.json
 ```
 
-Spawns the server over stdio (`@command @arg...`), calls `--tool`, and writes its
-`structuredContent` to `--out` (or the full `CallToolResult` with `--full`) — ready
-to feed straight into `render_panel`'s `fixture`.
+Spawns the server over stdio (`--command`/`--arg`), calls `--tool`, and writes its
+`structuredContent` to `--out` (or the full `CallToolResult` with `--full`) — ready to
+feed straight into `render_panel`'s `fixture`.
 
 ## Using it with Claude
 
 This is a **stdio** MCP server, so it works anywhere Claude reads an MCP server
-config: Claude Code (CLI, VS Code/JetBrains extensions) and Claude Desktop. It
-does **not** work as a Claude.ai web "custom connector" — those require a remote
-(HTTP/SSE) server, which this package doesn't provide.
+config: Claude Code (CLI, VS Code/JetBrains extensions) and Claude Desktop. It does
+**not** work as a Claude.ai web "custom connector" — those require a remote (HTTP/SSE)
+server, which this package doesn't provide.
 
-### Prerequisites
-
-- **Node 20+** (the CLI uses `node:util`'s `parseArgs`).
-- **A Chromium browser for Playwright.** The default runner drives a real
-  Chromium, which Playwright downloads separately from npm. One time, run:
-  ```bash
-  npx playwright install chromium
-  ```
-  Without it, `render_panel`/`interact` fail with a "browser not found" error the
-  first time they run. (If you only ever use `runner: "jsdom"`, you can skip this.)
+**Prerequisites:** Node 20+, and (for the default Chromium runner) a one-time
+`npx playwright install chromium`. Skip the browser install if you only ever use
+`runner: "jsdom"`.
 
 ### Claude Code
-
-The one-liner (adds it to the current project's `.mcp.json`):
 
 ```bash
 claude mcp add mcp-apps-harness -- npx -y --package=@overdraft-protocol/mcp-apps-harness mcp-apps-harness-mcp
 ```
 
-Add `-s user` to register it globally for all your projects instead of just the
-current one:
-
-```bash
-claude mcp add -s user mcp-apps-harness -- npx -y --package=@overdraft-protocol/mcp-apps-harness mcp-apps-harness-mcp
-```
-
-Or write the config by hand — create/edit `.mcp.json` at your project root:
+Add `-s user` to register it globally instead of just the current project. Or write
+`.mcp.json` by hand:
 
 ```json
 {
@@ -181,34 +139,19 @@ Or write the config by hand — create/edit `.mcp.json` at your project root:
 }
 ```
 
-Claude Code prompts you to approve a newly added project MCP server the first time
-it starts; approve it, then `render_panel` and `interact` show up as tools. Run
-`/mcp` inside Claude Code to confirm the server is connected.
+Approve the server when Claude Code prompts you, then `render_panel` and `interact`
+show up as tools. Run `/mcp` to confirm it's connected.
 
 ### Claude Desktop
 
-Edit `claude_desktop_config.json` (Settings → Developer → Edit Config, or:
-`~/Library/Application Support/Claude/claude_desktop_config.json` on macOS,
-`%APPDATA%\Claude\claude_desktop_config.json` on Windows) and add the same
-`mcpServers` block shown above, then fully restart Claude Desktop.
-
-### Why `--package=…` and the exact bin name
-
-The package ships **two** binaries: `mcp-apps-harness-mcp` (the MCP server, which
-Claude talks to over stdio) and `mcp-apps-harness` (the human-facing CLI). Because
-the package name is scoped (`@overdraft-protocol/…`), `npx`'s default bin-name
-matching resolves the bare package to `mcp-apps-harness` (the CLI) — the wrong one
-for Claude. Naming `mcp-apps-harness-mcp` explicitly, with `--package` telling npx
-which package that bin lives in, is what points Claude at the server.
-
-`-y` skips npx's install confirmation prompt (needed since Claude runs it
-non-interactively). npx caches the package after first fetch, so subsequent
-launches are fast; to pin a version, use `@overdraft-protocol/mcp-apps-harness@0.1.0`.
+Add the same `mcpServers` block above to `claude_desktop_config.json` (Settings →
+Developer → Edit Config, or `~/Library/Application Support/Claude/claude_desktop_config.json`
+on macOS / `%APPDATA%\Claude\claude_desktop_config.json` on Windows), then restart
+Claude Desktop.
 
 ### Local checkout instead of npm
 
-If you've cloned this repo and want Claude to run your local build (e.g. while
-developing the harness itself), point at the built server directly instead:
+Developing the harness itself? Point at your local build instead:
 
 ```json
 {
@@ -220,42 +163,55 @@ developing the harness itself), point at the built server directly instead:
 
 (Run `npm install && npm run build` in the checkout first.)
 
-### Using it once connected
+<details>
+<summary>Why the npx invocation needs <code>--package=…</code> and the <code>-mcp</code> suffix</summary>
 
-Ask Claude in natural language — e.g. *"render dist/repos.html with this fixture
-and show me the screenshot"* or *"click the Save button and mock repos_set
-returning success, then check for console errors."* Claude calls `render_panel` /
-`interact` with the arguments described under [MCP tools](#mcp-tools) above.
+The package ships two binaries: `mcp-apps-harness-mcp` (the MCP server) and
+`mcp-apps-harness` (the CLI). Because the package name is scoped
+(`@overdraft-protocol/…`), `npx`'s default bin-name matching resolves the bare
+package to `mcp-apps-harness` — the CLI, not the server. Naming the server's bin
+explicitly, with `--package` telling npx which package it lives in, is what actually
+points Claude at the server. `-y` skips npx's install-confirmation prompt, needed
+since Claude runs it non-interactively.
 
-### Standalone CLI (no Claude)
+</details>
 
-The CLI bin is available from the same package for shell/CI use:
+## How it works
 
-```bash
-npx -y --package=@overdraft-protocol/mcp-apps-harness mcp-apps-harness render --help
-```
+Panels built with `@modelcontextprotocol/ext-apps`'s `App` class talk to their host
+over `postMessage`: `App.connect()` sends `ui/initialize`, the host replies with
+capabilities + context, the app sends `ui/notifications/initialized`, and the host
+pushes the first `ui/notifications/tool-result` to trigger the panel's render. From
+then on, `app.callServerTool(...)` proxies `tools/call` through the host.
 
-## Self-test
+This harness implements the **host** side of that protocol as a pure, self-contained
+reducer (`handleHostMessage`, in `src/mock-host.ts`), plus two runners that share it:
 
-`example/` contains a tiny real ext-apps panel (repo list + Save button, built with
-the actual `App` API and bundled via esbuild into a single classic-script HTML file)
-used to validate the harness end-to-end:
+- **Chromium** (default, always works) — loads the panel's real HTML into an iframe
+  inside a Playwright page and drives everything through real `postMessage`/DOM/JS.
+  Produces real screenshots.
+- **jsdom** (fast path, no screenshots) — runs the reducer directly in the same Node
+  process, no browser needed. Works for panels built as a classic (non-module)
+  script; see [Known limitations](#known-limitations) for what it can't do. See
+  `src/runner-jsdom.ts` for the (nontrivial) implementation notes if you're curious
+  why it doesn't just use an iframe like the Chromium runner does.
 
-```bash
-npm run selftest
-```
+## Known limitations
 
-This builds the harness, builds the example panel, and runs two suites:
-
-- `example/selftest.mjs` (library API): the fixture renders via a real
-  `App.connect()` handshake, a mocked `tools/call` response flows back through
-  `callServerTool`, an unmapped tool call is reported when no mock response is
-  queued, `getHostCapabilities().serverTools`/`openLinks` gating both work, all
-  of the above against both the Chromium and jsdom runners, and `panel` resolution
-  through `.mcp-apps-harness.json` (including running its `buildCommand`).
-- `example/selftest-cli.mjs` (CLI): `render` writes a real PNG, `--json` +
-  `--steps` work, `--panel`/`--cwd` resolve through the project config, and
-  `capture-fixture` round-trips a real tool call against `dist/mcp-server.js`.
+- Only `ui/initialize`, `ui/notifications/initialized`, `ui/notifications/tool-result`
+  (push), `tools/call`, and `ui/open-link` are modeled with real behavior. Other
+  request methods (`ui/download-file`, `ui/message`, `ui/update-model-context`,
+  `ui/request-display-mode`, `resources/*`, `sampling/createMessage`) get a generic
+  empty-result acknowledgement so the app's promise resolves instead of hanging.
+- The Chromium runner's panel iframe isn't sandboxed (no `sandbox` attribute, no
+  dedicated origin) — this simplifies same-origin DOM access but doesn't verify a
+  panel's behavior under the CSP/sandbox restrictions a real host would apply.
+- jsdom cannot execute `<script type="module">` (a jsdom limitation, not specific to
+  this harness) and has no real layout engine, so it can't produce screenshots and
+  auto-resize is a no-op there. Use the Chromium runner for module-script bundles or
+  when you need a screenshot.
+- `panelUrl` has no timeout and no custom-header support — a hanging or
+  auth-protected remote server will hang the render or fail with 401/403.
 
 ## Library usage
 
@@ -269,24 +225,17 @@ const result = await renderPanel({
 // result.dom, result.screenshot (base64 PNG), result.errors, result.unmappedToolCalls
 ```
 
-## Known limitations (MVP scope)
+## Development
 
-- Only `ui/initialize`, `ui/notifications/initialized`, `ui/notifications/tool-result`
-  (push), `tools/call`, and `ui/open-link` are modeled with real behavior. Other
-  request methods (`ui/download-file`, `ui/message`, `ui/update-model-context`,
-  `ui/request-display-mode`, `resources/*`, `sampling/createMessage`) get a generic
-  empty-result acknowledgement so the app's promise resolves instead of hanging —
-  they aren't exercised meaningfully yet.
-- The panel iframe (Chromium runner) isn't sandboxed (no `sandbox` attribute, no
-  dedicated origin) — this simplifies same-origin DOM access for the harness but
-  doesn't verify a panel's behavior under the CSP/sandbox restrictions a real host
-  would apply.
-- jsdom cannot execute `<script type="module">` — a real jsdom limitation, not
-  specific to this harness. If your panel bundle is ES modules (rather than a
-  classic IIFE/UMD script), the jsdom runner will time out on the handshake;
-  use the Chromium runner for those, or change your panel's build target.
-- jsdom has no real layout engine, so `sendSizeChanged`/auto-resize is a no-op
-  there (stubbed out — see runner-jsdom.ts) and there's no screenshot support;
-  use Chromium (`mode: "screenshot"` or `"both"`) when you need either.
-- No jsdom test-helper exports beyond `renderWithJsdom`/`renderPanel({ runner: "jsdom" })`
-  themselves — there's no separate Vitest/Jest-specific assertion wrapper.
+```bash
+git clone https://github.com/overdraft-protocol/mcp-apps-harness.git
+cd mcp-apps-harness
+npm install
+npm run selftest
+```
+
+`npm run selftest` builds the harness and a tiny real ext-apps panel (`example/`,
+built with the actual `App` API), then runs it end to end: a real `App.connect()`
+handshake, mocked `tools/call` responses flowing back through `callServerTool`,
+capability gating, `panelUrl`/project-config resolution, and the CLI — against both
+the Chromium and jsdom runners.
