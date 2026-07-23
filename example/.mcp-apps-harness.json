@@ -1,0 +1,5 @@
+{
+  "panels": {
+    "repos": { "path": "dist/panel.html", "buildCommand": "node build.mjs" }
+  }
+}
