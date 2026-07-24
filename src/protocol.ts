@@ -11,7 +11,7 @@
 export const PROTOCOL_VERSION = "2026-01-26";
 
 export const HOST_INFO = {
-  name: "mcp-apps-harness",
+  name: "inspect-tools",
   version: "0.1.0",
 } as const;
 
@@ -119,7 +119,7 @@ export function stripScriptBodies(html: string): string {
   return html.replace(
     /(<script\b[^>]*>)([\s\S]*?)(<\/script>)/gi,
     (_match, open: string, body: string, close: string) =>
-      body.trim().length === 0 ? `${open}${body}${close}` : `${open}/* ${body.length} chars elided by mcp-apps-harness */${close}`,
+      body.trim().length === 0 ? `${open}${body}${close}` : `${open}/* ${body.length} chars elided by inspect-tools */${close}`,
   );
 }
 

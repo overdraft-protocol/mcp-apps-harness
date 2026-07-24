@@ -81,7 +81,7 @@ export async function renderWithJsdom(options: JsdomRenderOptions): Promise<Rend
     runScripts: "dangerously",
     resources: "usable",
     pretendToBeVisual: true,
-    url: "https://mcp-apps-harness.local/panel/",
+    url: "https://inspect-tools.local/panel/",
     virtualConsole,
     beforeParse(window) {
       const fakeParent: { postMessage(message: unknown, targetOrigin: string): void } = {
@@ -136,7 +136,7 @@ export async function renderWithJsdom(options: JsdomRenderOptions): Promise<Rend
       }
       const target = window.document.querySelector(step.action.selector);
       if (!target) {
-        throw new Error(`mcp-apps-harness: selector not found in panel: ${step.action.selector}`);
+        throw new Error(`inspect-tools: selector not found in panel: ${step.action.selector}`);
       }
       if (step.action.type === "click") {
         (target as unknown as HTMLElement).click();
@@ -172,7 +172,7 @@ async function waitFor(predicate: () => boolean, timeoutMs: number, label: strin
   const start = Date.now();
   while (!predicate()) {
     if (Date.now() - start > timeoutMs) {
-      throw new Error(`mcp-apps-harness: timed out waiting for ${label}`);
+      throw new Error(`inspect-tools: timed out waiting for ${label}`);
     }
     await sleep(20);
   }

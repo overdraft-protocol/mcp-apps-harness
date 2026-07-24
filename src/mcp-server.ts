@@ -52,9 +52,9 @@ const baseShape = {
     .string()
     .optional()
     .describe(
-      "Panel name looked up in .mcp-apps-harness.json's `panels` map (runs its buildCommand first, if any). Provide exactly one of panelPath, html, panelUrl, panel.",
+      "Panel name looked up in .inspect-tools.json's `panels` map (runs its buildCommand first, if any). Provide exactly one of panelPath, html, panelUrl, panel.",
     ),
-  cwd: z.string().optional().describe("Directory to look for .mcp-apps-harness.json in, when using `panel`. Default process.cwd()."),
+  cwd: z.string().optional().describe("Directory to look for .inspect-tools.json in, when using `panel`. Default process.cwd()."),
   fixture: z.record(z.string(), z.unknown()).describe("structuredContent (or a full CallToolResult) pushed once the panel connects."),
   capabilities: z.object(capabilitiesShape).optional(),
   mode: z.enum(["dom", "screenshot", "both"]).optional().describe("What to capture. Default both."),
@@ -114,7 +114,7 @@ function toToolResponse(result: RenderResult) {
   };
 }
 
-const server = new McpServer({ name: "mcp-apps-harness", version: "0.1.0" });
+const server = new McpServer({ name: "inspect-tools", version: "0.1.0" });
 
 server.registerTool(
   "render_panel",

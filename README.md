@@ -1,10 +1,10 @@
-# mcp-apps-harness
+# inspect-tools
 
 Render real, built [ext-apps](https://github.com/modelcontextprotocol/ext-apps) HTML
 panels against a mock MCP host, so you can iterate on a panel's UI — DOM, screenshots,
 console errors, mocked tool calls — without a real host or MCP server in the loop.
 
-[`@overdraft-protocol/mcp-apps-harness`](https://www.npmjs.com/package/@overdraft-protocol/mcp-apps-harness) on npm · MIT licensed
+[`@overdraft-protocol/inspect-tools`](https://www.npmjs.com/package/@overdraft-protocol/inspect-tools) on npm · MIT licensed
 
 ```
 edit panel -> build -> render_panel({ panelPath, fixture }) -> read DOM/errors/screenshot -> iterate
@@ -14,7 +14,7 @@ edit panel -> build -> render_panel({ panelPath, fixture }) -> read DOM/errors/s
 
 ```bash
 npx playwright install chromium   # one-time: the default runner drives a real browser
-claude mcp add mcp-apps-harness -- npx -y --package=@overdraft-protocol/mcp-apps-harness mcp-apps-harness-mcp
+claude mcp add inspect-tools -- npx -y --package=@overdraft-protocol/inspect-tools inspect-tools-mcp
 ```
 
 Then just ask Claude, e.g. *"render dist/repos.html with this fixture and show me the
@@ -42,11 +42,11 @@ exactly one panel source:
 | `panelPath` | Read a built HTML file off disk. |
 | `html` | The built HTML content, inline. |
 | `panelUrl` | Fetch the built HTML from a URL, e.g. a running dev server (`http://localhost:5173/repos.html`). Needs no filesystem access — see [Filesystem access](#filesystem-access-on-macos). |
-| `panel` | Look the name up in `.mcp-apps-harness.json` (may resolve to either of the above) — see [Project config](#project-config). |
+| `panel` | Look the name up in `.inspect-tools.json` (may resolve to either of the above) — see [Project config](#project-config). |
 
 ## Project config
 
-Instead of tracking build output paths by hand, add a `.mcp-apps-harness.json` at
+Instead of tracking build output paths by hand, add a `.inspect-tools.json` at
 your project root:
 
 ```json
@@ -80,11 +80,11 @@ isn't subject to the same restriction, so this needs no filesystem grant at all.
 For use outside an MCP client (shell scripts, CI, quick manual checks):
 
 ```bash
-npx -y --package=@overdraft-protocol/mcp-apps-harness mcp-apps-harness render \
+npx -y --package=@overdraft-protocol/inspect-tools inspect-tools render \
   --panel-path dist/repos.html --fixture @fixture.json --out screenshot.png
 
-mcp-apps-harness render --panel repos --cwd . --fixture '{"repos":[]}' --mode dom
-mcp-apps-harness render --help
+inspect-tools render --panel repos --cwd . --fixture '{"repos":[]}' --mode dom
+inspect-tools render --help
 ```
 
 `--fixture`, `--steps`, `--capabilities`, and `--tool-args` accept either inline JSON
@@ -98,7 +98,7 @@ Capture a real tool result from an actual MCP server as a fixture, instead of
 hand-writing one:
 
 ```bash
-mcp-apps-harness capture-fixture \
+inspect-tools capture-fixture \
   --command node --arg path/to/server.js \
   --tool get_repos --tool-args '{"owner":"anthropics"}' \
   --out fixtures/repos.json
@@ -122,7 +122,7 @@ server, which this package doesn't provide.
 ### Claude Code
 
 ```bash
-claude mcp add mcp-apps-harness -- npx -y --package=@overdraft-protocol/mcp-apps-harness mcp-apps-harness-mcp
+claude mcp add inspect-tools -- npx -y --package=@overdraft-protocol/inspect-tools inspect-tools-mcp
 ```
 
 Add `-s user` to register it globally instead of just the current project. Or write
@@ -131,9 +131,9 @@ Add `-s user` to register it globally instead of just the current project. Or wr
 ```json
 {
   "mcpServers": {
-    "mcp-apps-harness": {
+    "inspect-tools": {
       "command": "npx",
-      "args": ["-y", "--package=@overdraft-protocol/mcp-apps-harness", "mcp-apps-harness-mcp"]
+      "args": ["-y", "--package=@overdraft-protocol/inspect-tools", "inspect-tools-mcp"]
     }
   }
 }
@@ -156,7 +156,7 @@ Developing the harness itself? Point at your local build instead:
 ```json
 {
   "mcpServers": {
-    "mcp-apps-harness": { "command": "node", "args": ["/absolute/path/to/mcp-apps-harness/dist/mcp-server.js"] }
+    "inspect-tools": { "command": "node", "args": ["/absolute/path/to/inspect-tools/dist/mcp-server.js"] }
   }
 }
 ```
@@ -166,10 +166,10 @@ Developing the harness itself? Point at your local build instead:
 <details>
 <summary>Why the npx invocation needs <code>--package=…</code> and the <code>-mcp</code> suffix</summary>
 
-The package ships two binaries: `mcp-apps-harness-mcp` (the MCP server) and
-`mcp-apps-harness` (the CLI). Because the package name is scoped
+The package ships two binaries: `inspect-tools-mcp` (the MCP server) and
+`inspect-tools` (the CLI). Because the package name is scoped
 (`@overdraft-protocol/…`), `npx`'s default bin-name matching resolves the bare
-package to `mcp-apps-harness` — the CLI, not the server. Naming the server's bin
+package to `inspect-tools` — the CLI, not the server. Naming the server's bin
 explicitly, with `--package` telling npx which package it lives in, is what actually
 points Claude at the server. `-y` skips npx's install-confirmation prompt, needed
 since Claude runs it non-interactively.
@@ -220,7 +220,7 @@ reducer (`handleHostMessage`, in `src/mock-host.ts`), plus two runners that shar
 ## Library usage
 
 ```ts
-import { renderPanel, interact } from "@overdraft-protocol/mcp-apps-harness";
+import { renderPanel, interact } from "@overdraft-protocol/inspect-tools";
 
 const result = await renderPanel({
   panelPath: "dist/repos.html",
@@ -232,8 +232,8 @@ const result = await renderPanel({
 ## Development
 
 ```bash
-git clone https://github.com/overdraft-protocol/mcp-apps-harness.git
-cd mcp-apps-harness
+git clone https://github.com/overdraft-protocol/inspect-tools.git
+cd inspect-tools
 npm install
 npm run selftest
 ```

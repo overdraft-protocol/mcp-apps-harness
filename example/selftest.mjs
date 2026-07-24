@@ -24,7 +24,7 @@ async function main() {
   const rendered = await renderPanel({ html, fixture, mode: "both" });
   assert(rendered.errors.length === 0, `no console errors on initial render (got: ${JSON.stringify(rendered.errors)})`);
   assert(rendered.dom.includes("overdraft"), "DOM contains fixture repo name");
-  assert(rendered.dom.includes("mcp-apps-harness"), "DOM contains second fixture repo name");
+  assert(rendered.dom.includes("inspect-tools"), "DOM contains second fixture repo name");
   assert(typeof rendered.screenshot === "string" && rendered.screenshot.length > 0, "screenshot captured");
 
   // 2. Interact: click Save with a mocked tools/call response -> panel shows "saved".
@@ -78,7 +78,7 @@ async function main() {
   assert(protocol.dom.includes("contents=0"), "readServerResource resolves with empty contents, not a schema error");
   assert(
     protocol.dom.includes("sampling-rejected:") &&
-      protocol.dom.includes("mcp-apps-harness: sampling/createMessage is not mocked"),
+      protocol.dom.includes("inspect-tools: sampling/createMessage is not mocked"),
     "createSamplingMessage rejects cleanly with an explanatory message instead of a raw schema error",
   );
 
@@ -124,7 +124,7 @@ async function main() {
   });
   assert(jsdomSaved.dom.includes('id="status">saved<'), "jsdom: status shows saved after mocked tools/call response");
 
-  // 7. `panel` option: resolve via example/.mcp-apps-harness.json, which points
+  // 7. `panel` option: resolve via example/.inspect-tools.json, which points
   // at dist/panel.html with a buildCommand ("node build.mjs"). Delete the built
   // file first so a passing render proves the buildCommand actually ran.
   await rm(path.join(__dirname, "dist/panel.html"), { force: true });
@@ -137,7 +137,7 @@ async function main() {
   // but still available on request.
   const rawHtmlSize = html.length;
   assert(rendered.dom.length < rawHtmlSize / 10, `default DOM elides the inlined bundle (${rendered.dom.length} chars vs ${rawHtmlSize} of source HTML)`);
-  assert(rendered.dom.includes("elided by mcp-apps-harness"), "default DOM marks where script bodies were elided");
+  assert(rendered.dom.includes("elided by inspect-tools"), "default DOM marks where script bodies were elided");
   assert(rendered.dom.includes("<ul id=\"repo-list\">"), "elision preserves the actual rendered markup");
 
   const withScripts = await renderPanel({ html, fixture, mode: "dom", includeScripts: true });
@@ -175,10 +175,10 @@ async function main() {
     assert(viaUrl.dom.includes("overdraft"), "panelUrl: fetched panel rendered the fixture");
     assert(viaUrl.dom.includes('id="status">saved<'), "panelUrl: full interact cycle works over HTTP");
 
-    // A url-declared entry in .mcp-apps-harness.json resolves the same way.
+    // A url-declared entry in .inspect-tools.json resolves the same way.
     const urlConfigDir = path.join(__dirname, "dist");
     await writeFile(
-      path.join(urlConfigDir, ".mcp-apps-harness.json"),
+      path.join(urlConfigDir, ".inspect-tools.json"),
       JSON.stringify({ panels: { "repos-dev": { url: `http://127.0.0.1:${port}/repos.html` } } }),
     );
     const viaUrlConfig = await renderPanel({ panel: "repos-dev", cwd: urlConfigDir, fixture, mode: "dom" });

@@ -1,6 +1,6 @@
 {
   "repos": [
     { "id": "1", "name": "overdraft", "starred": true },
-    { "id": "2", "name": "mcp-apps-harness", "starred": false }
+    { "id": "2", "name": "inspect-tools", "starred": false }
   ]
 }

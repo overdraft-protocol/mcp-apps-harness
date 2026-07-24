@@ -1,6 +1,6 @@
 {
-  "name": "@overdraft-protocol/mcp-apps-harness",
-  "version": "0.2.0",
+  "name": "@overdraft-protocol/inspect-tools",
+  "version": "0.1.0",
   "description": "Render real ext-apps HTML panels against a mock MCP host for fast iteration",
   "license": "MIT",
   "type": "module",
@@ -10,15 +10,15 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/overdraft-protocol/mcp-apps-harness.git"
+    "url": "git+https://github.com/overdraft-protocol/inspect-tools.git"
   },
-  "homepage": "https://github.com/overdraft-protocol/mcp-apps-harness#readme",
+  "homepage": "https://github.com/overdraft-protocol/inspect-tools#readme",
   "bugs": {
-    "url": "https://github.com/overdraft-protocol/mcp-apps-harness/issues"
+    "url": "https://github.com/overdraft-protocol/inspect-tools/issues"
   },
   "bin": {
-    "mcp-apps-harness": "dist/cli.js",
-    "mcp-apps-harness-mcp": "dist/mcp-server.js"
+    "inspect-tools": "dist/cli.js",
+    "inspect-tools-mcp": "dist/mcp-server.js"
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",

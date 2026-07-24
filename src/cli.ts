@@ -5,9 +5,9 @@
  * screenshot to disk instead of returning it inline.
  *
  * Usage:
- *   mcp-apps-harness render --panel-path dist/repos.html --fixture @fixture.json --out screenshot.png
- *   mcp-apps-harness render --panel repos --cwd . --fixture '{"repos":[]}' --mode dom
- *   mcp-apps-harness capture-fixture --command node --arg dist/server.js --tool get_repos --out fixture.json
+ *   inspect-tools render --panel-path dist/repos.html --fixture @fixture.json --out screenshot.png
+ *   inspect-tools render --panel repos --cwd . --fixture '{"repos":[]}' --mode dom
+ *   inspect-tools capture-fixture --command node --arg dist/server.js --tool get_repos --out fixture.json
  *
  * JSON-shaped arguments (--fixture, --steps, --capabilities, --tool-args)
  * accept either inline JSON or `@path/to/file.json`.
@@ -27,14 +27,14 @@ function printUsageAndExit(code: number): never {
   console.error(
     [
       "Usage:",
-      "  mcp-apps-harness render --panel-path <file> | --panel-url <url> | --panel <name> --fixture <json|@file> [options]",
-      "  mcp-apps-harness capture-fixture --command <cmd> [--arg <a> ...] --tool <name> --out <file> [--tool-args <json|@file>]",
+      "  inspect-tools render --panel-path <file> | --panel-url <url> | --panel <name> --fixture <json|@file> [options]",
+      "  inspect-tools capture-fixture --command <cmd> [--arg <a> ...] --tool <name> --out <file> [--tool-args <json|@file>]",
       "",
       "render options:",
       "  --panel-path <file>       Built single-file HTML panel.",
       "  --panel-url <url>         Fetch the built panel HTML from a URL (e.g. a dev server).",
-      "  --panel <name>            Panel name from .mcp-apps-harness.json (use with --cwd).",
-      "  --cwd <dir>               Directory to resolve .mcp-apps-harness.json in. Default: cwd.",
+      "  --panel <name>            Panel name from .inspect-tools.json (use with --cwd).",
+      "  --cwd <dir>               Directory to resolve .inspect-tools.json in. Default: cwd.",
       "  --fixture <json|@file>    structuredContent pushed once the panel connects. Required.",
       "  --steps <json|@file>      Array of interact steps.",
       "  --capabilities <json|@file>",
@@ -72,11 +72,11 @@ async function runRender(argv: string[]): Promise<void> {
 
   if (values.help) printUsageAndExit(0);
   if (!values.fixture) {
-    console.error("mcp-apps-harness render: --fixture is required\n");
+    console.error("inspect-tools render: --fixture is required\n");
     printUsageAndExit(1);
   }
   if (!values["panel-path"] && !values.panel && !values["panel-url"]) {
-    console.error("mcp-apps-harness render: one of --panel-path, --panel-url or --panel is required\n");
+    console.error("inspect-tools render: one of --panel-path, --panel-url or --panel is required\n");
     printUsageAndExit(1);
   }
 
@@ -139,7 +139,7 @@ async function runCaptureFixture(argv: string[]): Promise<void> {
 
   if (values.help) printUsageAndExit(0);
   if (!values.command || !values.tool || !values.out) {
-    console.error("mcp-apps-harness capture-fixture: --command, --tool, and --out are required\n");
+    console.error("inspect-tools capture-fixture: --command, --tool, and --out are required\n");
     printUsageAndExit(1);
   }
 
@@ -147,14 +147,14 @@ async function runCaptureFixture(argv: string[]): Promise<void> {
   const { StdioClientTransport } = await import("@modelcontextprotocol/sdk/client/stdio.js");
 
   const toolArgs = (await readJsonArg<Record<string, unknown>>(values["tool-args"])) ?? {};
-  const client = new Client({ name: "mcp-apps-harness-capture-fixture", version: "0.1.0" });
+  const client = new Client({ name: "inspect-tools-capture-fixture", version: "0.1.0" });
   const transport = new StdioClientTransport({ command: values.command, args: values.arg as string[] });
 
   await client.connect(transport);
   try {
     const result = await client.callTool({ name: values.tool, arguments: toolArgs });
     if (result.isError) {
-      console.error(`mcp-apps-harness: tool "${values.tool}" returned an error result:`, result.content);
+      console.error(`inspect-tools: tool "${values.tool}" returned an error result:`, result.content);
     }
     const toWrite = values.full ? result : (result.structuredContent ?? {});
     await writeFile(values.out, JSON.stringify(toWrite, null, 2));
@@ -172,7 +172,7 @@ async function main(): Promise<void> {
     await runCaptureFixture(rest);
   } else {
     if (command !== undefined && command !== "--help" && command !== "-h") {
-      console.error(`mcp-apps-harness: unknown command "${command}"\n`);
+      console.error(`inspect-tools: unknown command "${command}"\n`);
     }
     printUsageAndExit(command === "--help" || command === "-h" ? 0 : 1);
   }

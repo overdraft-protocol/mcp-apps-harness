@@ -130,7 +130,7 @@ export function handleHostMessage(msg: any, state: MockHostState): JsonRpcMessag
           content: [
             {
               type: "text",
-              text: `mcp-apps-harness: no mock response configured for tool "${name}"`,
+              text: `inspect-tools: no mock response configured for tool "${name}"`,
             },
           ],
           isError: true,
@@ -189,7 +189,7 @@ export function handleHostMessage(msg: any, state: MockHostState): JsonRpcMessag
     out.push({
       jsonrpc: "2.0",
       id: msg.id,
-      error: { code: -32601, message: "mcp-apps-harness: sampling/createMessage is not mocked by this harness" },
+      error: { code: -32601, message: "inspect-tools: sampling/createMessage is not mocked by this harness" },
     });
     return out;
   }

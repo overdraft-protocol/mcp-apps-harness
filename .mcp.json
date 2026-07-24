@@ -1,6 +1,6 @@
 {
   "mcpServers": {
-    "mcp-apps-harness": {
+    "inspect-tools": {
       "command": "node",
       "args": ["dist/mcp-server.js"]
     }

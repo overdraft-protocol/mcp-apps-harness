@@ -62,7 +62,7 @@ async function main() {
   const parsed = JSON.parse(jsonOut.stdout);
   assert(parsed.dom.includes('id="status">saved<'), "cli render --json: interact step applied via CLI");
 
-  // 3. --panel/--cwd resolves through .mcp-apps-harness.json.
+  // 3. --panel/--cwd resolves through .inspect-tools.json.
   const panelOut = await execFileAsync("node", [
     cliPath,
     "render",
@@ -75,7 +75,7 @@ async function main() {
     "--mode",
     "dom",
   ]);
-  assert(panelOut.stdout.includes("Console errors: none"), "cli render --panel: resolves via .mcp-apps-harness.json");
+  assert(panelOut.stdout.includes("Console errors: none"), "cli render --panel: resolves via .inspect-tools.json");
 
   // 4. capture-fixture against our own mcp-server.js.
   const capturedPath = path.join(__dirname, "dist/cli-selftest-captured.json");

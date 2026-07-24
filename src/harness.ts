@@ -31,12 +31,12 @@ export interface RenderPanelOptions {
    */
   panelUrl?: string;
   /**
-   * Panel name looked up in `.mcp-apps-harness.json`'s `panels` map. The entry
+   * Panel name looked up in `.inspect-tools.json`'s `panels` map. The entry
    * may specify `path` or `url`; if it has a `buildCommand`, that runs first.
    * Provide exactly one panel source.
    */
   panel?: string;
-  /** Directory to look for `.mcp-apps-harness.json` in, when using `panel`. Default `process.cwd()`. */
+  /** Directory to look for `.inspect-tools.json` in, when using `panel`. Default `process.cwd()`. */
   cwd?: string;
   /** The `structuredContent` (or full CallToolResult) to push once the panel connects. */
   fixture: unknown;
@@ -68,7 +68,7 @@ export async function renderPanel(options: RenderPanelOptions): Promise<RenderRe
   );
   if (sources.length !== 1) {
     throw new Error(
-      "mcp-apps-harness: renderPanel requires exactly one of `html`, `panelPath`, `panelUrl`, or `panel`",
+      "inspect-tools: renderPanel requires exactly one of `html`, `panelPath`, `panelUrl`, or `panel`",
     );
   }
 
@@ -78,7 +78,7 @@ export async function renderPanel(options: RenderPanelOptions): Promise<RenderRe
   if (runner === "jsdom") {
     if (options.mode === "screenshot" || options.mode === "both") {
       throw new Error(
-        'mcp-apps-harness: runner "jsdom" cannot capture screenshots — pass mode: "dom", or omit `runner` to use Chromium',
+        'inspect-tools: runner "jsdom" cannot capture screenshots — pass mode: "dom", or omit `runner` to use Chromium',
       );
     }
     return renderWithJsdom({
@@ -106,7 +106,7 @@ export async function renderPanel(options: RenderPanelOptions): Promise<RenderRe
  * Resolve whichever panel source the caller supplied down to an HTML string.
  *
  * A `panel` name may resolve to either a path or a URL depending on how the
- * project's `.mcp-apps-harness.json` declares it.
+ * project's `.inspect-tools.json` declares it.
  */
 async function loadPanelHtml(options: RenderPanelOptions): Promise<string> {
   if (options.html !== undefined) return options.html;
@@ -127,11 +127,11 @@ async function fetchPanelHtml(url: string): Promise<string> {
     response = await fetch(url);
   } catch (err) {
     throw new Error(
-      `mcp-apps-harness: could not fetch panel from ${url} (${(err as Error).message}) — is the dev server running?`,
+      `inspect-tools: could not fetch panel from ${url} (${(err as Error).message}) — is the dev server running?`,
     );
   }
   if (!response.ok) {
-    throw new Error(`mcp-apps-harness: fetching panel from ${url} returned HTTP ${response.status} ${response.statusText}`);
+    throw new Error(`inspect-tools: fetching panel from ${url} returned HTTP ${response.status} ${response.statusText}`);
   }
   return response.text();
 }
@@ -143,7 +143,7 @@ async function readPanelFile(path: string): Promise<string> {
     const code = (err as NodeJS.ErrnoException).code;
     if (code === "EPERM" && process.platform === "darwin") {
       throw new Error(
-        `mcp-apps-harness: permission denied reading ${path}.\n` +
+        `inspect-tools: permission denied reading ${path}.\n` +
           "On macOS, ~/Documents, ~/Desktop and ~/Downloads are protected: a process whose parent app was denied access to that folder gets EPERM even though the file is readable by you. Either:\n" +
           "  - serve the panel from a dev server and pass `panelUrl` instead (no filesystem access needed), or\n" +
           "  - grant the host app access under System Settings > Privacy & Security > Files and Folders, or\n" +
