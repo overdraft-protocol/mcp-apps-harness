@@ -1,6 +1,6 @@
 {
   "name": "@overdraft-protocol/inspect-tools",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Render real ext-apps HTML panels against a mock MCP host for fast iteration",
   "license": "MIT",
   "type": "module",
@@ -22,6 +22,7 @@
   },
   "scripts": {
     "build": "tsc -p tsconfig.json",
+    "prepublishOnly": "npm run build",
     "dev": "tsc -p tsconfig.json --watch",
     "example:build": "node example/build.mjs",
     "selftest": "npm run build && npm run example:build && node example/selftest.mjs && node example/selftest-cli.mjs",
